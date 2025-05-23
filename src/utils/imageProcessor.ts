@@ -69,55 +69,57 @@ const createCombinedImage = async (
     
     const checkBothLoaded = () => {
       if (leftLoaded && rightLoaded) {
-        const drawImage = (img: HTMLImageElement, file: FileData, x: number) => {
-          const targetWidth = canvas.width / 2;
-          const targetHeight = canvas.height;
-          
-          let sourceX = 0;
-          let sourceY = 0;
-          let sourceWidth = img.width;
-          let sourceHeight = img.height;
-          
-          if (file.crop) {
-            sourceX = file.crop.x;
-            sourceY = file.crop.y;
-            sourceWidth = file.crop.width;
-            sourceHeight = file.crop.height;
-          }
-          
-          const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight);
-          const scaledWidth = sourceWidth * scale * (file.zoom || 1);
-          const scaledHeight = sourceHeight * scale * (file.zoom || 1);
-          
-          const drawX = x + (targetWidth - scaledWidth) / 2;
-          const drawY = (targetHeight - scaledHeight) / 2;
-          
-          ctx.save();
-          ctx.translate(x + targetWidth / 2, targetHeight / 2);
-          if (file.transform) {
-            ctx.rotate((file.transform.rotation * Math.PI) / 180);
-            ctx.scale(file.transform.scale, file.transform.scale);
-            ctx.translate(file.transform.position.x, file.transform.position.y);
-          }
-          ctx.translate(-targetWidth / 2, -targetHeight / 2);
-          
-          ctx.drawImage(
-            img,
-            sourceX,
-            sourceY,
-            sourceWidth,
-            sourceHeight,
-            drawX,
-            drawY,
-            scaledWidth,
-            scaledHeight
-          );
-          
-          ctx.restore();
-        };
+        // Draw left image
+        ctx.save();
+        ctx.translate(canvas.width / 4, canvas.height / 2);
+        if (leftFile.transform) {
+          ctx.rotate((leftFile.transform.rotation * Math.PI) / 180);
+          ctx.scale(leftFile.transform.scale, leftFile.transform.scale);
+          ctx.translate(leftFile.transform.position.x, leftFile.transform.position.y);
+        }
+        ctx.translate(-canvas.width / 4, -canvas.height / 2);
+        
+        const leftRatio = leftImg.width / leftImg.height;
+        let leftDrawWidth = canvas.width / 2;
+        let leftDrawHeight = canvas.height;
+        
+        if (leftRatio > 0.5625) { // 9/16
+          leftDrawWidth = leftDrawHeight * leftRatio;
+        } else {
+          leftDrawHeight = leftDrawWidth / leftRatio;
+        }
+        
+        const leftDrawX = (canvas.width / 2 - leftDrawWidth) / 2;
+        const leftDrawY = (canvas.height - leftDrawHeight) / 2;
+        
+        ctx.drawImage(leftImg, leftDrawX, leftDrawY, leftDrawWidth, leftDrawHeight);
+        ctx.restore();
 
-        drawImage(leftImg, leftFile, 0);
-        drawImage(rightImg, rightFile, canvas.width / 2);
+        // Draw right image
+        ctx.save();
+        ctx.translate(canvas.width * 3/4, canvas.height / 2);
+        if (rightFile.transform) {
+          ctx.rotate((rightFile.transform.rotation * Math.PI) / 180);
+          ctx.scale(rightFile.transform.scale, rightFile.transform.scale);
+          ctx.translate(rightFile.transform.position.x, rightFile.transform.position.y);
+        }
+        ctx.translate(-canvas.width * 3/4, -canvas.height / 2);
+        
+        const rightRatio = rightImg.width / rightImg.height;
+        let rightDrawWidth = canvas.width / 2;
+        let rightDrawHeight = canvas.height;
+        
+        if (rightRatio > 0.5625) { // 9/16
+          rightDrawWidth = rightDrawHeight * rightRatio;
+        } else {
+          rightDrawHeight = rightDrawWidth / rightRatio;
+        }
+        
+        const rightDrawX = canvas.width / 2 + (canvas.width / 2 - rightDrawWidth) / 2;
+        const rightDrawY = (canvas.height - rightDrawHeight) / 2;
+        
+        ctx.drawImage(rightImg, rightDrawX, rightDrawY, rightDrawWidth, rightDrawHeight);
+        ctx.restore();
 
         if (textOptions?.enabled && textOptions?.text) {
           const fontStyle = [];
@@ -169,7 +171,11 @@ const createCombinedImage = async (
           name,
           leftPhoto: leftFile.preview,
           rightPhoto: rightFile.preview,
-          textOptions
+          textOptions,
+          transform: {
+            left: leftFile.transform,
+            right: rightFile.transform
+          }
         });
       }
     };
