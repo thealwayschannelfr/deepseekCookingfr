@@ -51,7 +51,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
         [side]: transform
       }
     };
-    onImageUpdate(selectedImage, updatedImage);
+    
     await updateDataUrl(selectedImage, updatedImage);
   };
 
@@ -62,8 +62,54 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
       ...processedImages[selectedImage],
       textOptions: newOptions
     };
-    onImageUpdate(selectedImage, updatedImage);
+    
     await updateDataUrl(selectedImage, updatedImage);
+  };
+
+  const renderText = (image: ProcessedImage, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    if (image.textOptions?.enabled && image.textOptions?.text) {
+      const textOptions = image.textOptions;
+      const fontStyle = [];
+      if (textOptions.bold) fontStyle.push('bold');
+      if (textOptions.italic) fontStyle.push('italic');
+      
+      ctx.font = `${fontStyle.join(' ')} ${textOptions.size}px ${textOptions.font}`;
+      ctx.fillStyle = textOptions.color || '#000000';
+      
+      const text = textOptions.text;
+      const metrics = ctx.measureText(text);
+      const textHeight = textOptions.size;
+      
+      let textX = 0;
+      let textY = 0;
+      
+      switch (textOptions.position) {
+        case 'top-left':
+          textX = 20;
+          textY = textHeight + 20;
+          break;
+        case 'top-right':
+          textX = canvas.width - metrics.width - 20;
+          textY = textHeight + 20;
+          break;
+        case 'bottom-left':
+          textX = 20;
+          textY = canvas.height - 20;
+          break;
+        case 'bottom-right':
+          textX = canvas.width - metrics.width - 20;
+          textY = canvas.height - 20;
+          break;
+      }
+      
+      if (textOptions.stroke) {
+        ctx.strokeStyle = textOptions.strokeColor || '#FFFFFF';
+        ctx.lineWidth = textOptions.strokeWidth || 2;
+        ctx.strokeText(text, textX, textY);
+      }
+      
+      ctx.fillText(text, textX, textY);
+    }
   };
 
   const updateDataUrl = async (index: number, updatedImage: ProcessedImage) => {
@@ -93,7 +139,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
           const targetWidth = canvas.width / 2;
           const targetHeight = canvas.height;
           const x = side === 'left' ? 0 : targetWidth;
-
+          
           const transform = updatedImage.transform?.[side];
 
           ctx.save();
@@ -107,63 +153,20 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
 
           ctx.translate(-targetWidth / 2, -targetHeight / 2);
 
-          // Calculate scaling to maintain aspect ratio while filling the space
           const scale = Math.max(targetWidth / img.width, targetHeight / img.height);
           const scaledWidth = img.width * scale;
           const scaledHeight = img.height * scale;
           const drawX = x + (targetWidth - scaledWidth) / 2;
           const drawY = (targetHeight - scaledHeight) / 2;
 
-          ctx.drawImage(img, drawX, drawY, scaledWidth, scaledHeight);
+          ctx.drawImage(img, 0, 0, img.width, img.height, drawX, drawY, scaledWidth, scaledHeight);
           ctx.restore();
         };
 
         drawImage(leftImg, 'left');
         drawImage(rightImg, 'right');
-
-        if (updatedImage.textOptions?.enabled && updatedImage.textOptions?.text) {
-          const textOptions = updatedImage.textOptions;
-          const fontStyle = [];
-          if (textOptions.bold) fontStyle.push('bold');
-          if (textOptions.italic) fontStyle.push('italic');
-
-          ctx.font = `${fontStyle.join(' ')} ${textOptions.size}px ${textOptions.font}`;
-          ctx.fillStyle = textOptions.color || '#000000';
-
-          const text = textOptions.text;
-          const metrics = ctx.measureText(text);
-          const textHeight = textOptions.size;
-
-          let textX = 0;
-          let textY = 0;
-
-          switch (textOptions.position) {
-            case 'top-left':
-              textX = 20;
-              textY = textHeight + 20;
-              break;
-            case 'top-right':
-              textX = canvas.width - metrics.width - 20;
-              textY = textHeight + 20;
-              break;
-            case 'bottom-left':
-              textX = 20;
-              textY = canvas.height - 20;
-              break;
-            case 'bottom-right':
-              textX = canvas.width - metrics.width - 20;
-              textY = canvas.height - 20;
-              break;
-          }
-
-          if (textOptions.stroke) {
-            ctx.strokeStyle = textOptions.strokeColor || '#FFFFFF';
-            ctx.lineWidth = textOptions.strokeWidth || 2;
-            ctx.strokeText(text, textX, textY);
-          }
-
-          ctx.fillText(text, textX, textY);
-        }
+        
+        renderText(updatedImage, canvas, ctx);
 
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
         onImageUpdate(index, { ...updatedImage, dataUrl });
@@ -255,6 +258,28 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
                 onTransformChange={(transform) => handleTransformUpdate('right', transform)}
               />
             </div>
+            {processedImages[selectedImage].textOptions?.enabled && processedImages[selectedImage].textOptions?.text && (
+              <div
+                className="absolute"
+                style={{
+                  font: `${processedImages[selectedImage].textOptions?.bold ? 'bold' : ''} ${processedImages[selectedImage].textOptions?.italic ? 'italic' : ''} ${processedImages[selectedImage].textOptions?.size}px ${processedImages[selectedImage].textOptions?.font}`,
+                  color: processedImages[selectedImage].textOptions?.color || '#000000',
+                  textShadow: processedImages[selectedImage].textOptions?.stroke ? `-${processedImages[selectedImage].textOptions?.strokeWidth || 2}px -${processedImages[selectedImage].textOptions?.strokeWidth || 2}px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'},
+                  ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px -${processedImages[selectedImage].textOptions?.strokeWidth || 2}px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'},
+                  -${processedImages[selectedImage].textOptions?.strokeWidth || 2}px ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'},
+                  ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'}` : 'none',
+                  top: processedImages[selectedImage].textOptions?.position.includes('top') ? '10px' : 'unset',
+                  bottom: processedImages[selectedImage].textOptions?.position.includes('bottom') ? '10px' : 'unset',
+                  left: processedImages[selectedImage].textOptions?.position.includes('left') ? '10px' : 'unset',
+                  right: processedImages[selectedImage].textOptions?.position.includes('right') ? '10px' : 'unset',
+                  textAlign: processedImages[selectedImage].textOptions?.position.includes('right') ? 'right' : 'left',
+                  width: '100%',
+                  padding: '5px',
+                }}
+              >
+                {processedImages[selectedImage].textOptions?.text}
+              </div>
+            )}
           </div>
           
           <div className="flex space-x-4 mb-4">
