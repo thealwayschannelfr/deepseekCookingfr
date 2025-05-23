@@ -69,57 +69,49 @@ const createCombinedImage = async (
     
     const checkBothLoaded = () => {
       if (leftLoaded && rightLoaded) {
-        // Draw left image
-        ctx.save();
-        ctx.translate(canvas.width / 4, canvas.height / 2);
-        if (leftFile.transform) {
-          ctx.rotate((leftFile.transform.rotation * Math.PI) / 180);
-          ctx.scale(leftFile.transform.scale, leftFile.transform.scale);
-          ctx.translate(leftFile.transform.position.x, leftFile.transform.position.y);
-        }
-        ctx.translate(-canvas.width / 4, -canvas.height / 2);
-        
-        const leftRatio = leftImg.width / leftImg.height;
-        let leftDrawWidth = canvas.width / 2;
-        let leftDrawHeight = canvas.height;
-        
-        if (leftRatio > 0.5625) { // 9/16
-          leftDrawWidth = leftDrawHeight * leftRatio;
-        } else {
-          leftDrawHeight = leftDrawWidth / leftRatio;
-        }
-        
-        const leftDrawX = (canvas.width / 2 - leftDrawWidth) / 2;
-        const leftDrawY = (canvas.height - leftDrawHeight) / 2;
-        
-        ctx.drawImage(leftImg, leftDrawX, leftDrawY, leftDrawWidth, leftDrawHeight);
-        ctx.restore();
+        const drawImage = (img: HTMLImageElement, x: number, transform?: Transform) => {
+          const halfWidth = canvas.width / 2;
+          const centerX = x + halfWidth / 2;
+          
+          ctx.save();
+          
+          // Move to center point of the half
+          ctx.translate(centerX, canvas.height / 2);
+          
+          // Apply transformations if they exist
+          if (transform) {
+            ctx.rotate((transform.rotation * Math.PI) / 180);
+            ctx.scale(transform.scale, transform.scale);
+            ctx.translate(transform.position.x, transform.position.y);
+          }
+          
+          // Move back
+          ctx.translate(-centerX, -canvas.height / 2);
+          
+          // Calculate dimensions maintaining aspect ratio
+          const imgRatio = img.width / img.height;
+          let drawWidth = halfWidth;
+          let drawHeight = canvas.height;
+          
+          if (imgRatio > halfWidth / canvas.height) {
+            drawWidth = drawHeight * imgRatio;
+          } else {
+            drawHeight = drawWidth / imgRatio;
+          }
+          
+          // Center the image in its half
+          const drawX = x + (halfWidth - drawWidth) / 2;
+          const drawY = (canvas.height - drawHeight) / 2;
+          
+          ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+          ctx.restore();
+        };
 
+        // Draw left image
+        drawImage(leftImg, 0, leftFile.transform);
+        
         // Draw right image
-        ctx.save();
-        ctx.translate(canvas.width * 3/4, canvas.height / 2);
-        if (rightFile.transform) {
-          ctx.rotate((rightFile.transform.rotation * Math.PI) / 180);
-          ctx.scale(rightFile.transform.scale, rightFile.transform.scale);
-          ctx.translate(rightFile.transform.position.x, rightFile.transform.position.y);
-        }
-        ctx.translate(-canvas.width * 3/4, -canvas.height / 2);
-        
-        const rightRatio = rightImg.width / rightImg.height;
-        let rightDrawWidth = canvas.width / 2;
-        let rightDrawHeight = canvas.height;
-        
-        if (rightRatio > 0.5625) { // 9/16
-          rightDrawWidth = rightDrawHeight * rightRatio;
-        } else {
-          rightDrawHeight = rightDrawWidth / rightRatio;
-        }
-        
-        const rightDrawX = canvas.width / 2 + (canvas.width / 2 - rightDrawWidth) / 2;
-        const rightDrawY = (canvas.height - rightDrawHeight) / 2;
-        
-        ctx.drawImage(rightImg, rightDrawX, rightDrawY, rightDrawWidth, rightDrawHeight);
-        ctx.restore();
+        drawImage(rightImg, canvas.width / 2, rightFile.transform);
 
         if (textOptions?.enabled && textOptions?.text) {
           const fontStyle = [];
