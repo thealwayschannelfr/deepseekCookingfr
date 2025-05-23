@@ -67,7 +67,6 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
   };
 
   const updateDataUrl = async (index: number, updatedImage: ProcessedImage) => {
-    // Create a temporary canvas to draw the combined image
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
@@ -88,64 +87,39 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
     let leftLoaded = false;
     let rightLoaded = false;
 
-    const leftFile = {
-      file: null,
-      name: 'left',
-      preview: updatedImage.leftPhoto,
-      transform: updatedImage.transform?.left
-    };
-
-    const rightFile = {
-      file: null,
-      name: 'right',
-      preview: updatedImage.rightPhoto,
-      transform: updatedImage.transform?.right
-    };
-
     const checkBothLoaded = () => {
       if (leftLoaded && rightLoaded) {
-        const drawImage = (img: HTMLImageElement, file: any, x: number) => {
+        const drawImage = (img: HTMLImageElement, side: 'left' | 'right') => {
           const targetWidth = canvas.width / 2;
           const targetHeight = canvas.height;
+          const x = side === 'left' ? 0 : targetWidth;
 
-          let sourceX = 0;
-          let sourceY = 0;
-          let sourceWidth = img.width;
-          let sourceHeight = img.height;
-
-          const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight);
-          const scaledWidth = sourceWidth * scale;
-          const scaledHeight = sourceHeight * scale;
-
-          const drawX = x + (targetWidth - scaledWidth) / 2;
-          const drawY = (targetHeight - scaledHeight) / 2;
+          const transform = updatedImage.transform?.[side];
 
           ctx.save();
           ctx.translate(x + targetWidth / 2, targetHeight / 2);
-          if (file.transform) {
-            ctx.rotate((file.transform.rotation * Math.PI) / 180);
-            ctx.scale(file.transform.scale, file.transform.scale);
-            ctx.translate(file.transform.position.x, file.transform.position.y);
+
+          if (transform) {
+            ctx.rotate((transform.rotation * Math.PI) / 180);
+            ctx.scale(transform.scale, transform.scale);
+            ctx.translate(transform.position.x, transform.position.y);
           }
+
           ctx.translate(-targetWidth / 2, -targetHeight / 2);
 
-          ctx.drawImage(
-            img,
-            sourceX,
-            sourceY,
-            sourceWidth,
-            sourceHeight,
-            drawX,
-            drawY,
-            scaledWidth,
-            scaledHeight
-          );
+          // Calculate scaling to maintain aspect ratio while filling the space
+          const scale = Math.max(targetWidth / img.width, targetHeight / img.height);
+          const scaledWidth = img.width * scale;
+          const scaledHeight = img.height * scale;
+          const drawX = x + (targetWidth - scaledWidth) / 2;
+          const drawY = (targetHeight - scaledHeight) / 2;
 
+          ctx.drawImage(img, drawX, drawY, scaledWidth, scaledHeight);
           ctx.restore();
         };
 
-        drawImage(leftImg, leftFile, 0);
-        drawImage(rightImg, rightFile, canvas.width / 2);
+        drawImage(leftImg, 'left');
+        drawImage(rightImg, 'right');
 
         if (updatedImage.textOptions?.enabled && updatedImage.textOptions?.text) {
           const textOptions = updatedImage.textOptions;
@@ -192,9 +166,6 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
         }
 
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-
-        const newProcessedImages = [...processedImages];
-        newProcessedImages[index] = { ...updatedImage, dataUrl };
         onImageUpdate(index, { ...updatedImage, dataUrl });
       }
     };
@@ -208,9 +179,6 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
       rightLoaded = true;
       checkBothLoaded();
     };
-
-    leftImg.onerror = () => console.error(`Failed to load left image: ${updatedImage.leftPhoto}`);
-    rightImg.onerror = () => console.error(`Failed to load right image: ${updatedImage.rightPhoto}`);
 
     leftImg.src = updatedImage.leftPhoto;
     rightImg.src = updatedImage.rightPhoto;
@@ -287,28 +255,6 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
                 onTransformChange={(transform) => handleTransformUpdate('right', transform)}
               />
             </div>
-            {processedImages[selectedImage].textOptions?.enabled && processedImages[selectedImage].textOptions?.text && (
-              <div
-                className="absolute"
-                style={{
-                  font: `${processedImages[selectedImage].textOptions?.bold ? 'bold' : ''} ${processedImages[selectedImage].textOptions?.italic ? 'italic' : ''} ${processedImages[selectedImage].textOptions?.size}px ${processedImages[selectedImage].textOptions?.font}`,
-                  color: processedImages[selectedImage].textOptions?.color || '#000000',
-                  textShadow: processedImages[selectedImage].textOptions?.stroke ? `-${processedImages[selectedImage].textOptions?.strokeWidth || 2}px -${processedImages[selectedImage].textOptions?.strokeWidth || 2}px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'},
-                  ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px -${processedImages[selectedImage].textOptions?.strokeWidth || 2}px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'},
-                  -${processedImages[selectedImage].textOptions?.strokeWidth || 2}px ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'},
-                  ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'}` : 'none',
-                  top: processedImages[selectedImage].textOptions?.position.includes('top') ? '10px' : 'unset',
-                  bottom: processedImages[selectedImage].textOptions?.position.includes('bottom') ? '10px' : 'unset',
-                  left: processedImages[selectedImage].textOptions?.position.includes('left') ? '10px' : 'unset',
-                  right: processedImages[selectedImage].textOptions?.position.includes('right') ? '10px' : 'unset',
-                  textAlign: processedImages[selectedImage].textOptions?.position.includes('right') ? 'right' : 'left',
-                  width: '100%',
-                  padding: '5px',
-                }}
-              >
-                {processedImages[selectedImage].textOptions?.text}
-              </div>
-            )}
           </div>
           
           <div className="flex space-x-4 mb-4">
