@@ -66,6 +66,54 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
     await updateDataUrl(selectedImage, updatedImage);
   };
 
+  const drawImageWithTransform = (
+    ctx: CanvasRenderingContext2D,
+    img: HTMLImageElement,
+    x: number,
+    width: number,
+    height: number,
+    transform?: { scale: number; rotation: number; position: { x: number; y: number } }
+  ) => {
+    ctx.save();
+    
+    // Center point for transformations
+    const centerX = x + width / 2;
+    const centerY = height / 2;
+    
+    // Move to center, apply transforms, then move back
+    ctx.translate(centerX, centerY);
+    if (transform) {
+      ctx.rotate((transform.rotation * Math.PI) / 180);
+      ctx.scale(transform.scale, transform.scale);
+      ctx.translate(transform.position.x, transform.position.y);
+    }
+    ctx.translate(-width / 2, -height / 2);
+
+    // Calculate scaling to maintain aspect ratio while filling the space
+    const imgRatio = img.width / img.height;
+    const targetRatio = width / height;
+    
+    let drawWidth = width;
+    let drawHeight = height;
+    
+    if (imgRatio > targetRatio) {
+      // Image is wider than target area
+      drawWidth = height * imgRatio;
+      drawHeight = height;
+    } else {
+      // Image is taller than target area
+      drawWidth = width;
+      drawHeight = width / imgRatio;
+    }
+
+    // Center the image in the target area
+    const drawX = x + (width - drawWidth) / 2;
+    const drawY = (height - drawHeight) / 2;
+
+    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+    ctx.restore();
+  };
+
   const renderText = (image: ProcessedImage, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
     if (image.textOptions?.enabled && image.textOptions?.text) {
       const textOptions = image.textOptions;
@@ -135,36 +183,25 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
 
     const checkBothLoaded = () => {
       if (leftLoaded && rightLoaded) {
-        const drawImage = (img: HTMLImageElement, side: 'left' | 'right') => {
-          const targetWidth = canvas.width / 2;
-          const targetHeight = canvas.height;
-          const x = side === 'left' ? 0 : targetWidth;
-          
-          const transform = updatedImage.transform?.[side];
+        // Draw left image
+        drawImageWithTransform(
+          ctx,
+          leftImg,
+          0,
+          canvas.width / 2,
+          canvas.height,
+          updatedImage.transform?.left
+        );
 
-          ctx.save();
-          ctx.translate(x + targetWidth / 2, targetHeight / 2);
-
-          if (transform) {
-            ctx.rotate((transform.rotation * Math.PI) / 180);
-            ctx.scale(transform.scale, transform.scale);
-            ctx.translate(transform.position.x, transform.position.y);
-          }
-
-          ctx.translate(-targetWidth / 2, -targetHeight / 2);
-
-          const scale = Math.max(targetWidth / img.width, targetHeight / img.height);
-          const scaledWidth = img.width * scale;
-          const scaledHeight = img.height * scale;
-          const drawX = x + (targetWidth - scaledWidth) / 2;
-          const drawY = (targetHeight - scaledHeight) / 2;
-
-          ctx.drawImage(img, 0, 0, img.width, img.height, drawX, drawY, scaledWidth, scaledHeight);
-          ctx.restore();
-        };
-
-        drawImage(leftImg, 'left');
-        drawImage(rightImg, 'right');
+        // Draw right image
+        drawImageWithTransform(
+          ctx,
+          rightImg,
+          canvas.width / 2,
+          canvas.width / 2,
+          canvas.height,
+          updatedImage.transform?.right
+        );
         
         renderText(updatedImage, canvas, ctx);
 
