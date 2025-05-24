@@ -1,5 +1,6 @@
 import { FileData, ProcessedImage, TextOptions } from '../types';
 import JSZip from 'jszip';
+import { drawImageWithTransform, renderTextOnCanvas } from './renderUtils';
 
 export const processImages = async (
   babyPhotos: FileData[],
@@ -55,6 +56,7 @@ const createCombinedImage = async (
       return;
     }
     
+    // Maintain same dimensions as preview canvas
     canvas.width = 1920;
     canvas.height = 1080;
     
@@ -69,106 +71,48 @@ const createCombinedImage = async (
     
     const checkBothLoaded = () => {
       if (leftLoaded && rightLoaded) {
-        const drawImage = (img: HTMLImageElement, x: number, transform?: any) => {
-          const halfWidth = canvas.width / 2;
-          
-          ctx.save();
-          
-          // Move to the center of the respective half
-          ctx.translate(x + halfWidth / 2, canvas.height / 2);
-          
-          // Apply transformations if they exist
-          if (transform) {
-            ctx.rotate((transform.rotation * Math.PI) / 180);
-            ctx.scale(transform.scale, transform.scale);
-            ctx.translate(transform.position.x, transform.position.y);
-          }
-          
-          // Move back
-          ctx.translate(-halfWidth / 2, -canvas.height / 2);
-          
-          // Calculate dimensions while maintaining aspect ratio
-          const imgRatio = img.width / img.height;
-          let drawWidth = halfWidth;
-          let drawHeight = canvas.height;
-          
-          if (imgRatio > halfWidth / canvas.height) {
-            drawWidth = drawHeight * imgRatio;
-          } else {
-            drawHeight = drawWidth / imgRatio;
-          }
-          
-          // Center the image in its half
-          const drawX = x + (halfWidth - drawWidth) / 2;
-          const drawY = (canvas.height - drawHeight) / 2;
-          
-          ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-          ctx.restore();
-        };
+        try {
+          // Draw left image using shared utility
+          drawImageWithTransform(
+            ctx,
+            leftImg,
+            0,
+            canvas.width / 2,
+            canvas.height,
+            leftFile.transform
+          );
 
-        // Draw left image
-        drawImage(leftImg, 0, leftFile.transform);
-        
-        // Draw right image
-        drawImage(rightImg, canvas.width / 2, rightFile.transform);
+          // Draw right image using shared utility
+          drawImageWithTransform(
+            ctx,
+            rightImg,
+            canvas.width / 2,
+            canvas.width / 2,
+            canvas.height,
+            rightFile.transform
+          );
 
-        // Add text if enabled
-        if (textOptions?.enabled && textOptions?.text) {
-          const fontStyle = [];
-          if (textOptions.bold) fontStyle.push('bold');
-          if (textOptions.italic) fontStyle.push('italic');
-          
-          ctx.font = `${fontStyle.join(' ')} ${textOptions.size}px ${textOptions.font}`;
-          ctx.fillStyle = textOptions.color || '#000000';
-          
-          const text = textOptions.text;
-          const metrics = ctx.measureText(text);
-          const textHeight = textOptions.size;
-          
-          let textX = 0;
-          let textY = 0;
-          
-          switch (textOptions.position) {
-            case 'top-left':
-              textX = 20;
-              textY = textHeight + 20;
-              break;
-            case 'top-right':
-              textX = canvas.width - metrics.width - 20;
-              textY = textHeight + 20;
-              break;
-            case 'bottom-left':
-              textX = 20;
-              textY = canvas.height - 20;
-              break;
-            case 'bottom-right':
-              textX = canvas.width - metrics.width - 20;
-              textY = canvas.height - 20;
-              break;
+          // Add text if enabled using shared utility
+          if (textOptions?.enabled && textOptions?.text) {
+            renderTextOnCanvas(ctx, textOptions, canvas);
           }
           
-          if (textOptions.stroke) {
-            ctx.strokeStyle = textOptions.strokeColor || '#FFFFFF';
-            ctx.lineWidth = textOptions.strokeWidth || 2;
-            ctx.strokeText(text, textX, textY);
-          }
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
           
-          ctx.fillText(text, textX, textY);
+          resolve({
+            dataUrl,
+            name,
+            leftPhoto: leftFile.preview,
+            rightPhoto: rightFile.preview,
+            textOptions,
+            transform: {
+              left: leftFile.transform,
+              right: rightFile.transform
+            }
+          });
+        } catch (error) {
+          reject(error);
         }
-        
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        
-        resolve({
-          dataUrl,
-          name,
-          leftPhoto: leftFile.preview,
-          rightPhoto: rightFile.preview,
-          textOptions,
-          transform: {
-            left: leftFile.transform,
-            right: rightFile.transform
-          }
-        });
       }
     };
     
@@ -193,12 +137,14 @@ const createCombinedImage = async (
 export const downloadAsZip = async (images: ProcessedImage[]) => {
   const zip = new JSZip();
 
-  images.forEach((image) => {
+  // Process each image for the zip file
+  await Promise.all(images.map(async (image) => {
     const fileName = `${image.name}_combined.jpg`;
     const data = image.dataUrl.split(',')[1];
     zip.file(fileName, data, { base64: true });
-  });
+  }));
 
+  // Generate and download the zip file
   const content = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(content);
 
@@ -207,7 +153,10 @@ export const downloadAsZip = async (images: ProcessedImage[]) => {
   link.download = 'processed_images.zip';
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
-
-  URL.revokeObjectURL(url);
+  
+  // Clean up
+  setTimeout(() => {
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 100);
 };
