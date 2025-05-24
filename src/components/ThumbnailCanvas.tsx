@@ -18,7 +18,7 @@ export const ThumbnailCanvas = ({
   textOptions
 }: ThumbnailCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scale = 300 / 1920;
+  const scale = 300 / 1920; // 300x168 maintains 16:9 aspect ratio
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -52,5 +52,11 @@ export const ThumbnailCanvas = ({
     rightImg.src = rightPhoto;
   }, [leftPhoto, rightPhoto, transform, textOptions]);
 
-  return <canvas ref={canvasRef} className="w-full h-full" style={{ imageRendering: 'crisp-edges' }} />;
+  return (
+    <canvas 
+      ref={canvasRef} 
+      className="w-full h-full"
+      style={{ imageRendering: 'crisp-edges' }}
+    />
+  );
 };
