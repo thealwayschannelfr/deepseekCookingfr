@@ -4,8 +4,8 @@ import { ProcessedImage, TextOptions, FileData } from '../types';
 import TextOptionsPanel from './TextOptions';
 import { downloadAsZip } from '../utils/imageProcessor';
 import TransformableImage from './TransformableImage';
-import ThumbnailCanvas from './ThumbnailCanvas';
-import { drawImageWithTransform, renderTextOnCanvas } from '../utils/renderUtils';
+import { ThumbnailCanvas } from './ThumbnailCanvas';
+import { renderCombinedImage } from '../utils/renderUtils';
 
 interface ResultsSectionProps {
   processedImages: ProcessedImage[];
@@ -80,56 +80,27 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
     canvas.width = 1920;
     canvas.height = 1080;
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     const leftImg = new Image();
     const rightImg = new Image();
 
-    let leftLoaded = false;
-    let rightLoaded = false;
-
-    const checkBothLoaded = () => {
-      if (leftLoaded && rightLoaded) {
-        // Draw left image
-        drawImageWithTransform(
+    const onLoad = () => {
+      if (leftImg.complete && rightImg.complete) {
+        renderCombinedImage(
           ctx,
           leftImg,
-          0,
-          canvas.width / 2,
-          canvas.height,
-          updatedImage.transform?.left
-        );
-
-        // Draw right image
-        drawImageWithTransform(
-          ctx,
           rightImg,
-          canvas.width / 2,
-          canvas.width / 2,
-          canvas.height,
-          updatedImage.transform?.right
+          updatedImage.transform?.left,
+          updatedImage.transform?.right,
+          updatedImage.textOptions,
+          1 // Full scale
         );
-        
-        if (updatedImage.textOptions) {
-          renderTextOnCanvas(ctx, updatedImage.textOptions, canvas);
-        }
 
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
         onImageUpdate(index, { ...updatedImage, dataUrl });
       }
     };
 
-    leftImg.onload = () => {
-      leftLoaded = true;
-      checkBothLoaded();
-    };
-
-    rightImg.onload = () => {
-      rightLoaded = true;
-      checkBothLoaded();
-    };
-
+    leftImg.onload = rightImg.onload = onLoad;
     leftImg.src = updatedImage.leftPhoto;
     rightImg.src = updatedImage.rightPhoto;
   };
