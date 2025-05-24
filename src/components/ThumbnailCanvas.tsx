@@ -1,8 +1,5 @@
-// src/components/ThumbnailCanvas.tsx
-
 import React, { useEffect, useRef } from 'react';
-import { FileData, ProcessedImage, TextOptions } from '../types';
-import { drawImageWithTransform, renderTextOnCanvas } from '../utils/renderUtils';
+import { renderCombinedImage } from '../utils/renderUtils';
 
 interface ThumbnailCanvasProps {
   leftPhoto: string;
@@ -11,7 +8,7 @@ interface ThumbnailCanvasProps {
     left?: any;
     right?: any;
   };
-  textOptions?: TextOptions;
+  textOptions?: any;
 }
 
 const ThumbnailCanvas: React.FC<ThumbnailCanvasProps> = ({
@@ -21,7 +18,7 @@ const ThumbnailCanvas: React.FC<ThumbnailCanvasProps> = ({
   textOptions
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const thumbnailSize = { width: 300, height: 168 }; // 16:9 aspect ratio
+  const scale = 300 / 1920; // Thumbnail width / Base width
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -30,69 +27,34 @@ const ThumbnailCanvas: React.FC<ThumbnailCanvasProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = thumbnailSize.width;
-    canvas.height = thumbnailSize.height;
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    canvas.width = 300;
+    canvas.height = 168; // 16:9 aspect ratio
 
     const leftImg = new Image();
     const rightImg = new Image();
 
-    let leftLoaded = false;
-    let rightLoaded = false;
-
-    const checkBothLoaded = () => {
-      if (leftLoaded && rightLoaded) {
-        // Draw left image
-        drawImageWithTransform(
+    leftImg.onload = () => {
+      rightImg.onload = () => {
+        renderCombinedImage(
           ctx,
           leftImg,
-          0,
-          canvas.width / 2,
-          canvas.height,
-          transform?.left
-        );
-
-        // Draw right image
-        drawImageWithTransform(
-          ctx,
           rightImg,
-          canvas.width / 2,
-          canvas.width / 2,
-          canvas.height,
-          transform?.right
+          transform?.left,
+          transform?.right,
+          textOptions,
+          scale
         );
-
-        // Render text
-        if (textOptions) {
-          renderTextOnCanvas(ctx, textOptions, canvas);
-        }
-      }
+      };
+      rightImg.src = rightPhoto;
     };
-
-    leftImg.onload = () => {
-      leftLoaded = true;
-      checkBothLoaded();
-    };
-
-    rightImg.onload = () => {
-      rightLoaded = true;
-      checkBothLoaded();
-    };
-
     leftImg.src = leftPhoto;
-    rightImg.src = rightPhoto;
-  }, [leftPhoto, rightPhoto, transform, textOptions]);
+  }, [leftPhoto, rightPhoto, transform, textOptions, scale]);
 
   return (
     <canvas
       ref={canvasRef}
       className="w-full h-full"
-      style={{
-        imageRendering: 'crisp-edges',
-        aspectRatio: '16/9'
-      }}
+      style={{ imageRendering: 'crisp-edges' }}
     />
   );
 };
