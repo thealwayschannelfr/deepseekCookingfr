@@ -1,25 +1,19 @@
-// src/components/ThumbnailCanvas.tsx
 import React, { useEffect, useRef } from 'react';
-import { renderCombinedPreview } from '../utils/renderUtils';
+import { renderUniversalPreview } from '../utils/renderUtils';
 
-interface ThumbnailCanvasProps {
-  leftPhoto: string;
-  rightPhoto: string;
-  transform?: {
-    left?: any;
-    right?: any;
-  };
-  textOptions?: any;
-}
-
-const ThumbnailCanvas: React.FC<ThumbnailCanvasProps> = ({
+export const ThumbnailCanvas = ({
   leftPhoto,
   rightPhoto,
   transform,
   textOptions
+}: {
+  leftPhoto: string;
+  rightPhoto: string;
+  transform: { left: any; right: any };
+  textOptions: any;
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scale = 300 / 1920; // Thumbnail is 300px wide
+  const scale = 0.15625; // 300px / 1920px
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -29,35 +23,26 @@ const ThumbnailCanvas: React.FC<ThumbnailCanvasProps> = ({
     if (!ctx) return;
 
     canvas.width = 300;
-    canvas.height = 168; // 16:9 aspect ratio
+    canvas.height = 168;
 
     const leftImg = new Image();
     const rightImg = new Image();
 
-    leftImg.onload = () => {
-      rightImg.onload = () => {
-        renderCombinedPreview(
-          ctx,
-          leftImg,
-          rightImg,
-          transform?.left,
-          transform?.right,
-          textOptions,
-          scale
-        );
-      };
-      rightImg.src = rightPhoto;
+    leftImg.onload = rightImg.onload = () => {
+      renderUniversalPreview(
+        ctx,
+        leftImg,
+        rightImg,
+        transform.left,
+        transform.right,
+        textOptions,
+        scale
+      );
     };
+
     leftImg.src = leftPhoto;
-  }, [leftPhoto, rightPhoto, transform, textOptions, scale]);
+    rightImg.src = rightPhoto;
+  }, [leftPhoto, rightPhoto, transform, textOptions]);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="w-full h-full"
-      style={{ imageRendering: 'crisp-edges' }}
-    />
-  );
+  return <canvas ref={canvasRef} className="w-full h-full" />;
 };
-
-export default ThumbnailCanvas;
