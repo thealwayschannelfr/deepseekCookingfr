@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, ArrowDown, Check, Edit2, Type, Move, ZoomIn } from 'lucide-react';
-import { ProcessedImage, TextOptions, FileData } from '../types';
+import { Download, ArrowDown, Check } from 'lucide-react';
+import { ProcessedImage, TextOptions } from '../types';
 import TextOptionsPanel from './TextOptions';
 import { downloadAsZip } from '../utils/imageProcessor';
 import TransformableImage from './TransformableImage';
 import { ThumbnailCanvas } from './ThumbnailCanvas';
-import { renderCombinedImage } from '../utils/renderUtils';
 
 interface ResultsSectionProps {
   processedImages: ProcessedImage[];
@@ -85,15 +84,68 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
 
     const onLoad = () => {
       if (leftImg.complete && rightImg.complete) {
-        renderCombinedImage(
-          ctx,
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw left image
+        const leftImgRatio = leftImg.width / leftImg.height;
+        const leftDrawWidth = leftImgRatio > 16/9 ? canvas.height * leftImgRatio / 2 : canvas.width / 2;
+        const leftDrawHeight = leftImgRatio > 16/9 ? canvas.height : canvas.width / 2 / leftImgRatio;
+        ctx.drawImage(
           leftImg,
-          rightImg,
-          updatedImage.transform?.left,
-          updatedImage.transform?.right,
-          updatedImage.textOptions,
-          1 // Full scale
+          (canvas.width / 4 - leftDrawWidth / 2),
+          (canvas.height / 2 - leftDrawHeight / 2),
+          leftDrawWidth,
+          leftDrawHeight
         );
+
+        // Draw right image
+        const rightImgRatio = rightImg.width / rightImg.height;
+        const rightDrawWidth = rightImgRatio > 16/9 ? canvas.height * rightImgRatio / 2 : canvas.width / 2;
+        const rightDrawHeight = rightImgRatio > 16/9 ? canvas.height : canvas.width / 2 / rightImgRatio;
+        ctx.drawImage(
+          rightImg,
+          (canvas.width * 3/4 - rightDrawWidth / 2),
+          (canvas.height / 2 - rightDrawHeight / 2),
+          rightDrawWidth,
+          rightDrawHeight
+        );
+
+        // Draw text
+        if (updatedImage.textOptions?.enabled && updatedImage.textOptions?.text) {
+          const fontSize = updatedImage.textOptions.size || 36;
+          ctx.font = `${updatedImage.textOptions.bold ? 'bold ' : ''}${
+            updatedImage.textOptions.italic ? 'italic ' : ''
+          }${fontSize}px ${updatedImage.textOptions.font}`;
+          ctx.fillStyle = updatedImage.textOptions.color || '#000000';
+          
+          const text = updatedImage.textOptions.text;
+          const metrics = ctx.measureText(text);
+          
+          let x = 20;
+          let y = fontSize + 20;
+          
+          switch(updatedImage.textOptions.position) {
+            case 'top-right':
+              x = canvas.width - metrics.width - 20;
+              break;
+            case 'bottom-left':
+              y = canvas.height - 20;
+              break;
+            case 'bottom-right':
+              x = canvas.width - metrics.width - 20;
+              y = canvas.height - 20;
+              break;
+          }
+          
+          if (updatedImage.textOptions.stroke) {
+            ctx.strokeStyle = updatedImage.textOptions.strokeColor || '#FFFFFF';
+            ctx.lineWidth = updatedImage.textOptions.strokeWidth || 2;
+            ctx.strokeText(text, x, y);
+          }
+          
+          ctx.fillText(text, x, y);
+        }
 
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
         onImageUpdate(index, { ...updatedImage, dataUrl });
