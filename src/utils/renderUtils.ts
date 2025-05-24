@@ -1,96 +1,102 @@
 import { TextOptions } from './types';
 
-export const drawImageWithTransform = (
+const BASE_WIDTH = 1920;
+const BASE_HEIGHT = 1080;
+
+export const renderCombinedImage = (
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  x: number,
-  width: number,
-  height: number,
-  transform?: { scale: number; rotation: number; position: { x: number; y: number } }
+  leftImg: HTMLImageElement,
+  rightImg: HTMLImageElement,
+  leftTransform?: any,
+  rightTransform?: any,
+  textOptions?: TextOptions,
+  scale: number = 1
 ) => {
+  // Clear canvas
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, BASE_WIDTH * scale, BASE_HEIGHT * scale);
+
+  // Draw left image (exact same logic for both previews)
   ctx.save();
-  
-  // Center point for transformations
-  const centerX = x + width / 2;
-  const centerY = height / 2;
-  
-  // Apply transformations
-  ctx.translate(centerX, centerY);
-  if (transform) {
-    ctx.rotate((transform.rotation * Math.PI) / 180);
-    ctx.scale(transform.scale, transform.scale);
-    ctx.translate(transform.position.x, transform.position.y);
+  const leftCenterX = (BASE_WIDTH / 4) * scale;
+  const leftCenterY = (BASE_HEIGHT / 2) * scale;
+  ctx.translate(leftCenterX, leftCenterY);
+  if (leftTransform) {
+    ctx.rotate((leftTransform.rotation * Math.PI) / 180);
+    ctx.scale(leftTransform.scale, leftTransform.scale);
+    ctx.translate(leftTransform.position.x, leftTransform.position.y);
   }
-  ctx.translate(-width / 2, -height / 2);
-
-  // Calculate scaling to match preview logic
-  const imgRatio = img.width / img.height;
-  const targetRatio = width / height;
+  ctx.translate(-(BASE_WIDTH / 4) * scale, -(BASE_HEIGHT / 2) * scale);
   
-  let drawWidth = width;
-  let drawHeight = height;
-  
-  if (imgRatio > targetRatio) {
-    drawWidth = height * imgRatio;
-    drawHeight = height;
-  } else {
-    drawWidth = width;
-    drawHeight = width / imgRatio;
-  }
-
-  // Center the image
-  const drawX = x + (width - drawWidth) / 2;
-  const drawY = (height - drawHeight) / 2;
-
-  ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+  const leftImgRatio = leftImg.width / leftImg.height;
+  const leftDrawWidth = leftImgRatio > 16/9 ? BASE_HEIGHT * leftImgRatio / 2 : BASE_WIDTH / 2;
+  const leftDrawHeight = leftImgRatio > 16/9 ? BASE_HEIGHT : BASE_WIDTH / 2 / leftImgRatio;
+  ctx.drawImage(
+    leftImg,
+    (BASE_WIDTH / 4 - leftDrawWidth / 2) * scale,
+    (BASE_HEIGHT / 2 - leftDrawHeight / 2) * scale,
+    leftDrawWidth * scale,
+    leftDrawHeight * scale
+  );
   ctx.restore();
-};
 
-export const renderTextOnCanvas = (
-  ctx: CanvasRenderingContext2D,
-  textOptions: TextOptions,
-  canvas: HTMLCanvasElement
-) => {
+  // Draw right image (exact same logic)
+  ctx.save();
+  const rightCenterX = (BASE_WIDTH * 3/4) * scale;
+  const rightCenterY = (BASE_HEIGHT / 2) * scale;
+  ctx.translate(rightCenterX, rightCenterY);
+  if (rightTransform) {
+    ctx.rotate((rightTransform.rotation * Math.PI) / 180);
+    ctx.scale(rightTransform.scale, rightTransform.scale);
+    ctx.translate(rightTransform.position.x, rightTransform.position.y);
+  }
+  ctx.translate(-(BASE_WIDTH / 4) * scale, -(BASE_HEIGHT / 2) * scale);
+  
+  const rightImgRatio = rightImg.width / rightImg.height;
+  const rightDrawWidth = rightImgRatio > 16/9 ? BASE_HEIGHT * rightImgRatio / 2 : BASE_WIDTH / 2;
+  const rightDrawHeight = rightImgRatio > 16/9 ? BASE_HEIGHT : BASE_WIDTH / 2 / rightImgRatio;
+  ctx.drawImage(
+    rightImg,
+    (BASE_WIDTH * 3/4 - rightDrawWidth / 2) * scale,
+    (BASE_HEIGHT / 2 - rightDrawHeight / 2) * scale,
+    rightDrawWidth * scale,
+    rightDrawHeight * scale
+  );
+  ctx.restore();
+
+  // Render text (scaled proportionally)
   if (textOptions?.enabled && textOptions?.text) {
-    const fontStyle = [];
-    if (textOptions.bold) fontStyle.push('bold');
-    if (textOptions.italic) fontStyle.push('italic');
-    
-    ctx.font = `${fontStyle.join(' ')} ${textOptions.size}px ${textOptions.font}`;
-    ctx.fillStyle = textOptions.color || '#000000';
+    const fontSize = (textOptions.size || 36) * scale;
+    ctx.font = `${textOptions.bold ? 'bold ' : ''}${
+      textOptions.italic ? 'italic ' : ''
+    }${fontSize}px ${textOptions.font}`;
     
     const text = textOptions.text;
     const metrics = ctx.measureText(text);
-    const textHeight = textOptions.size;
     
-    let textX = 0;
-    let textY = 0;
+    let x = 20 * scale;
+    let y = (fontSize + 20) * scale;
     
     switch (textOptions.position) {
-      case 'top-left':
-        textX = 20;
-        textY = textHeight + 20;
-        break;
       case 'top-right':
-        textX = canvas.width - metrics.width - 20;
-        textY = textHeight + 20;
+        x = BASE_WIDTH * scale - metrics.width - 20 * scale;
         break;
       case 'bottom-left':
-        textX = 20;
-        textY = canvas.height - 20;
+        y = BASE_HEIGHT * scale - 20 * scale;
         break;
       case 'bottom-right':
-        textX = canvas.width - metrics.width - 20;
-        textY = canvas.height - 20;
+        x = BASE_WIDTH * scale - metrics.width - 20 * scale;
+        y = BASE_HEIGHT * scale - 20 * scale;
         break;
     }
     
     if (textOptions.stroke) {
       ctx.strokeStyle = textOptions.strokeColor || '#FFFFFF';
-      ctx.lineWidth = textOptions.strokeWidth || 2;
-      ctx.strokeText(text, textX, textY);
+      ctx.lineWidth = (textOptions.strokeWidth || 2) * scale;
+      ctx.strokeText(text, x, y);
     }
     
-    ctx.fillText(text, textX, textY);
+    ctx.fillStyle = textOptions.color || '#000000';
+    ctx.fillText(text, x, y);
   }
 };
