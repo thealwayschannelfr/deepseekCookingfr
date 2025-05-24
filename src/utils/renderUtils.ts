@@ -12,7 +12,6 @@ export const renderCombinedImage = (
   textOptions?: TextOptions,
   scale: number = 1
 ) => {
-  // Set canvas dimensions
   const width = BASE_WIDTH * scale;
   const height = BASE_HEIGHT * scale;
 
@@ -20,57 +19,50 @@ export const renderCombinedImage = (
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, width, height);
 
-  // Draw left image
-  ctx.save();
-  const leftCenterX = (width / 4);
-  const leftCenterY = (height / 2);
-  ctx.translate(leftCenterX, leftCenterY);
-  ctx.rotate((leftTransform.rotation * Math.PI) / 180);
-  ctx.scale(leftTransform.scale, leftTransform.scale);
-  ctx.translate(leftTransform.position.x, leftTransform.position.y);
-  
-  const leftImgRatio = leftImg.width / leftImg.height;
-  const leftDrawWidth = leftImgRatio > (BASE_WIDTH/2)/BASE_HEIGHT 
-    ? height * leftImgRatio / 2 
-    : width / 2;
-  const leftDrawHeight = leftImgRatio > (BASE_WIDTH/2)/BASE_HEIGHT 
-    ? height 
-    : width / 2 / leftImgRatio;
-  
-  ctx.drawImage(
-    leftImg,
-    -leftDrawWidth / 2,
-    -leftDrawHeight / 2,
-    leftDrawWidth,
-    leftDrawHeight
-  );
-  ctx.restore();
+  // Universal image drawing with perfect aspect ratio preservation
+  const drawImage = (img: HTMLImageElement, xOffset: number, transform: any) => {
+    ctx.save();
+    
+    const imgRatio = img.width / img.height;
+    const containerRatio = (width / 2) / height;
+    
+    let drawWidth, drawHeight;
+    
+    if (imgRatio > containerRatio) {
+      // Image is wider than container - scale to width
+      drawWidth = width / 2;
+      drawHeight = drawWidth / imgRatio;
+    } else {
+      // Image is taller than container - scale to height
+      drawHeight = height;
+      drawWidth = drawHeight * imgRatio;
+    }
 
-  // Draw right image
-  ctx.save();
-  const rightCenterX = (width * 3/4);
-  const rightCenterY = (height / 2);
-  ctx.translate(rightCenterX, rightCenterY);
-  ctx.rotate((rightTransform.rotation * Math.PI) / 180);
-  ctx.scale(rightTransform.scale, rightTransform.scale);
-  ctx.translate(rightTransform.position.x, rightTransform.position.y);
-  
-  const rightImgRatio = rightImg.width / rightImg.height;
-  const rightDrawWidth = rightImgRatio > (BASE_WIDTH/2)/BASE_HEIGHT 
-    ? height * rightImgRatio / 2 
-    : width / 2;
-  const rightDrawHeight = rightImgRatio > (BASE_WIDTH/2)/BASE_HEIGHT 
-    ? height 
-    : width / 2 / rightImgRatio;
-  
-  ctx.drawImage(
-    rightImg,
-    -rightDrawWidth / 2,
-    -rightDrawHeight / 2,
-    rightDrawWidth,
-    rightDrawHeight
-  );
-  ctx.restore();
+    // Center position
+    const centerX = (xOffset * width) + (width / 4);
+    const centerY = height / 2;
+    
+    // Apply transforms
+    ctx.translate(centerX, centerY);
+    ctx.rotate((transform.rotation * Math.PI) / 180);
+    ctx.scale(transform.scale, transform.scale);
+    ctx.translate(transform.position.x, transform.position.y);
+    
+    // Draw image centered
+    ctx.drawImage(
+      img,
+      -drawWidth / 2,
+      -drawHeight / 2,
+      drawWidth,
+      drawHeight
+    );
+    
+    ctx.restore();
+  };
+
+  // Draw images
+  drawImage(leftImg, 0, leftTransform);
+  drawImage(rightImg, 0.5, rightTransform);
 
   // Draw text
   if (textOptions?.enabled && textOptions?.text) {
