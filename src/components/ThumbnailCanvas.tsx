@@ -1,19 +1,24 @@
 import React, { useEffect, useRef } from 'react';
-import { renderUniversalPreview } from '../utils/renderUtils';
+import { renderCombinedImage } from '../utils/renderUtils';
+
+interface ThumbnailCanvasProps {
+  leftPhoto: string;
+  rightPhoto: string;
+  transform: {
+    left: any;
+    right: any;
+  };
+  textOptions?: TextOptions;
+}
 
 export const ThumbnailCanvas = ({
   leftPhoto,
   rightPhoto,
   transform,
   textOptions
-}: {
-  leftPhoto: string;
-  rightPhoto: string;
-  transform: { left: any; right: any };
-  textOptions: any;
-}) => {
+}: ThumbnailCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scale = 0.15625; // 300px / 1920px
+  const scale = 300 / 1920;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -28,21 +33,24 @@ export const ThumbnailCanvas = ({
     const leftImg = new Image();
     const rightImg = new Image();
 
-    leftImg.onload = rightImg.onload = () => {
-      renderUniversalPreview(
-        ctx,
-        leftImg,
-        rightImg,
-        transform.left,
-        transform.right,
-        textOptions,
-        scale
-      );
+    const onLoad = () => {
+      if (leftImg.complete && rightImg.complete) {
+        renderCombinedImage(
+          ctx,
+          leftImg,
+          rightImg,
+          transform.left,
+          transform.right,
+          textOptions,
+          scale
+        );
+      }
     };
 
+    leftImg.onload = rightImg.onload = onLoad;
     leftImg.src = leftPhoto;
     rightImg.src = rightPhoto;
   }, [leftPhoto, rightPhoto, transform, textOptions]);
 
-  return <canvas ref={canvasRef} className="w-full h-full" />;
+  return <canvas ref={canvasRef} className="w-full h-full" style={{ imageRendering: 'crisp-edges' }} />;
 };
