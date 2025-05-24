@@ -1,136 +1,94 @@
-// src/utils/renderUtils.ts
 import { TextOptions } from './types';
 
-const BASE_WIDTH = 1920;
-const BASE_HEIGHT = 1080;
+const BASE_SIZE = { width: 1920, height: 1080 };
 
-export const drawImageWithTransform = (
+export const renderUniversalPreview = (
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  x: number,
-  width: number,
-  height: number,
-  transform?: { scale: number; rotation: number; position: { x: number; y: number } }
-) => {
-  ctx.save();
-  const centerX = x + width / 2;
-  const centerY = height / 2;
-  
-  ctx.translate(centerX, centerY);
-  if (transform) {
-    ctx.rotate((transform.rotation * Math.PI) / 180);
-    ctx.scale(transform.scale, transform.scale);
-    ctx.translate(transform.position.x, transform.position.y);
-  }
-  ctx.translate(-width / 2, -height / 2);
-
-  const imgRatio = img.width / img.height;
-  const targetRatio = width / height;
-  
-  let drawWidth = width;
-  let drawHeight = height;
-  
-  if (imgRatio > targetRatio) {
-    drawWidth = height * imgRatio;
-    drawHeight = height;
-  } else {
-    drawWidth = width;
-    drawHeight = width / imgRatio;
-  }
-
-  const drawX = x + (width - drawWidth) / 2;
-  const drawY = (height - drawHeight) / 2;
-
-  ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-  ctx.restore();
-};
-
-export const renderTextOnCanvas = (
-  ctx: CanvasRenderingContext2D,
-  textOptions: TextOptions,
-  canvasWidth: number,
-  canvasHeight: number,
+  leftImg: HTMLImageElement,
+  rightImg: HTMLImageElement,
+  leftTransform: any,
+  rightTransform: any,
+  textOptions?: TextOptions,
   scale: number = 1
 ) => {
+  // Clear canvas
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, BASE_SIZE.width * scale, BASE_SIZE.height * scale);
+
+  // Universal image drawing function
+  const drawImage = (img: HTMLImageElement, xOffset: number, transform: any) => {
+    ctx.save();
+    
+    // Base positions
+    const centerX = (BASE_SIZE.width * (xOffset + 0.25)) * scale;
+    const centerY = (BASE_SIZE.height / 2) * scale;
+    
+    // Apply transforms
+    ctx.translate(centerX, centerY);
+    ctx.rotate((transform?.rotation || 0) * Math.PI / 180);
+    ctx.scale(transform?.scale || 1, transform?.scale || 1);
+    ctx.translate(transform?.position?.x || 0, transform?.position?.y || 0);
+    
+    // Calculate dimensions
+    const imgRatio = img.width / img.height;
+    const targetRatio = 0.5 * BASE_SIZE.width / BASE_SIZE.height; // Half-width ratio
+    
+    let drawWidth, drawHeight;
+    if (imgRatio > targetRatio) {
+      drawHeight = BASE_SIZE.height * scale;
+      drawWidth = drawHeight * imgRatio;
+    } else {
+      drawWidth = BASE_SIZE.width * 0.5 * scale;
+      drawHeight = drawWidth / imgRatio;
+    }
+
+    // Draw image
+    ctx.drawImage(
+      img,
+      -drawWidth / 2,
+      -drawHeight / 2,
+      drawWidth,
+      drawHeight
+    );
+    
+    ctx.restore();
+  };
+
+  // Draw both images
+  drawImage(leftImg, 0, leftTransform);
+  drawImage(rightImg, 0.5, rightTransform);
+
+  // Draw text
   if (textOptions?.enabled && textOptions?.text) {
-    const fontSize = (textOptions.size || 36) * scale;
-    ctx.font = `${textOptions.bold ? 'bold ' : ''}${
-      textOptions.italic ? 'italic ' : ''
-    }${fontSize}px ${textOptions.font}`;
+    const effectiveScale = scale;
+    ctx.font = `${textOptions.bold ? 'bold ' : ''}${textOptions.italic ? 'italic ' : ''}${(textOptions.size || 36) * effectiveScale}px ${textOptions.font}`;
+    ctx.fillStyle = textOptions.color || '#000000';
     
     const text = textOptions.text;
     const metrics = ctx.measureText(text);
     
-    let x = 20 * scale;
-    let y = (fontSize + 20) * scale;
+    let x = 20 * effectiveScale;
+    let y = (textOptions.size || 36 + 20) * effectiveScale;
     
-    switch (textOptions.position) {
+    switch(textOptions.position) {
       case 'top-right':
-        x = canvasWidth - metrics.width - 20 * scale;
+        x = BASE_SIZE.width * effectiveScale - metrics.width - 20 * effectiveScale;
         break;
       case 'bottom-left':
-        y = canvasHeight - 20 * scale;
+        y = BASE_SIZE.height * effectiveScale - 20 * effectiveScale;
         break;
       case 'bottom-right':
-        x = canvasWidth - metrics.width - 20 * scale;
-        y = canvasHeight - 20 * scale;
+        x = BASE_SIZE.width * effectiveScale - metrics.width - 20 * effectiveScale;
+        y = BASE_SIZE.height * effectiveScale - 20 * effectiveScale;
         break;
     }
     
     if (textOptions.stroke) {
       ctx.strokeStyle = textOptions.strokeColor || '#FFFFFF';
-      ctx.lineWidth = (textOptions.strokeWidth || 2) * scale;
+      ctx.lineWidth = (textOptions.strokeWidth || 2) * effectiveScale;
       ctx.strokeText(text, x, y);
     }
     
-    ctx.fillStyle = textOptions.color || '#000000';
     ctx.fillText(text, x, y);
   }
-};
-
-// Additional export for the combined renderer
-export const renderCombinedPreview = (
-  ctx: CanvasRenderingContext2D,
-  leftImg: HTMLImageElement,
-  rightImg: HTMLImageElement,
-  leftTransform?: any,
-  rightTransform?: any,
-  textOptions?: TextOptions,
-  scale: number = 1
-) => {
-  const canvasWidth = BASE_WIDTH * scale;
-  const canvasHeight = BASE_HEIGHT * scale;
-
-  // White background
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-  // Draw left image
-  drawImageWithTransform(
-    ctx,
-    leftImg,
-    0,
-    canvasWidth / 2,
-    canvasHeight,
-    leftTransform
-  );
-
-  // Draw right image
-  drawImageWithTransform(
-    ctx,
-    rightImg,
-    canvasWidth / 2,
-    canvasWidth / 2,
-    canvasHeight,
-    rightTransform
-  );
-
-  // Draw text
-  renderTextOnCanvas(
-    ctx,
-    textOptions,
-    canvasWidth,
-    canvasHeight,
-    scale
-  );
 };
