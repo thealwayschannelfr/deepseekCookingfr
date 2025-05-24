@@ -4,6 +4,8 @@ import { ProcessedImage, TextOptions, FileData } from '../types';
 import TextOptionsPanel from './TextOptions';
 import { downloadAsZip } from '../utils/imageProcessor';
 import TransformableImage from './TransformableImage';
+import ThumbnailCanvas from './ThumbnailCanvas';
+import { drawImageWithTransform, renderTextOnCanvas } from '../utils/renderUtils';
 
 interface ResultsSectionProps {
   processedImages: ProcessedImage[];
@@ -66,100 +68,6 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
     await updateDataUrl(selectedImage, updatedImage);
   };
 
-  const drawImageWithTransform = (
-    ctx: CanvasRenderingContext2D,
-    img: HTMLImageElement,
-    x: number,
-    width: number,
-    height: number,
-    transform?: { scale: number; rotation: number; position: { x: number; y: number } }
-  ) => {
-    ctx.save();
-    
-    // Center point for transformations
-    const centerX = x + width / 2;
-    const centerY = height / 2;
-    
-    // Move to center, apply transforms, then move back
-    ctx.translate(centerX, centerY);
-    if (transform) {
-      ctx.rotate((transform.rotation * Math.PI) / 180);
-      ctx.scale(transform.scale, transform.scale);
-      ctx.translate(transform.position.x, transform.position.y);
-    }
-    ctx.translate(-width / 2, -height / 2);
-
-    // Calculate scaling to maintain aspect ratio while filling the space
-    const imgRatio = img.width / img.height;
-    const targetRatio = width / height;
-    
-    let drawWidth = width;
-    let drawHeight = height;
-    
-    if (imgRatio > targetRatio) {
-      // Image is wider than target area
-      drawWidth = height * imgRatio;
-      drawHeight = height;
-    } else {
-      // Image is taller than target area
-      drawWidth = width;
-      drawHeight = width / imgRatio;
-    }
-
-    // Center the image in the target area
-    const drawX = x + (width - drawWidth) / 2;
-    const drawY = (height - drawHeight) / 2;
-
-    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-    ctx.restore();
-  };
-
-  const renderText = (image: ProcessedImage, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
-    if (image.textOptions?.enabled && image.textOptions?.text) {
-      const textOptions = image.textOptions;
-      const fontStyle = [];
-      if (textOptions.bold) fontStyle.push('bold');
-      if (textOptions.italic) fontStyle.push('italic');
-      
-      ctx.font = `${fontStyle.join(' ')} ${textOptions.size}px ${textOptions.font}`;
-      ctx.fillStyle = textOptions.color || '#000000';
-      
-      const text = textOptions.text;
-      const metrics = ctx.measureText(text);
-      const textHeight = textOptions.size;
-      
-      let textX = 0;
-      let textY = 0;
-      
-      switch (textOptions.position) {
-        case 'top-left':
-          textX = 20;
-          textY = textHeight + 20;
-          break;
-        case 'top-right':
-          textX = canvas.width - metrics.width - 20;
-          textY = textHeight + 20;
-          break;
-        case 'bottom-left':
-          textX = 20;
-          textY = canvas.height - 20;
-          break;
-        case 'bottom-right':
-          textX = canvas.width - metrics.width - 20;
-          textY = canvas.height - 20;
-          break;
-      }
-      
-      if (textOptions.stroke) {
-        ctx.strokeStyle = textOptions.strokeColor || '#FFFFFF';
-        ctx.lineWidth = textOptions.strokeWidth || 2;
-        ctx.strokeText(text, textX, textY);
-      }
-      
-      ctx.fillText(text, textX, textY);
-    }
-  };
-
   const updateDataUrl = async (index: number, updatedImage: ProcessedImage) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -203,7 +111,9 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
           updatedImage.transform?.right
         );
         
-        renderText(updatedImage, canvas, ctx);
+        if (updatedImage.textOptions) {
+          renderTextOnCanvas(ctx, updatedImage.textOptions, canvas);
+        }
 
         const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
         onImageUpdate(index, { ...updatedImage, dataUrl });
@@ -251,15 +161,16 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
         {processedImages.map((image, index) => (
           <div
             key={index}
-            className={`relative aspect-video rounded-lg overflow-hidden cursor-pointer transition-all duration-200 transform hover:scale-[1.02] ${
+            className={`relative aspect-[16/9] rounded-lg overflow-hidden cursor-pointer transition-all duration-200 transform hover:scale-[1.02] ${
               selectedImage === index ? 'ring-2 ring-indigo-500' : ''
             }`}
             onClick={() => setSelectedImage(index)}
           >
-            <img
-              src={image.dataUrl}
-              alt={`Combined ${image.name}`}
-              className="w-full h-full object-cover"
+            <ThumbnailCanvas
+              leftPhoto={image.leftPhoto}
+              rightPhoto={image.rightPhoto}
+              transform={image.transform}
+              textOptions={image.textOptions}
             />
             {downloadedIndices.includes(index) && (
               <div className="absolute top-2 right-2 bg-green-500 text-white p-1 rounded-full">
@@ -272,7 +183,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
       
       {selectedImage !== null && (
         <div className="flex flex-col items-center">
-          <div className="relative w-full aspect-video rounded-lg overflow-hidden mb-4 flex bg-gray-100">
+          <div className="relative w-full aspect-[16/9] rounded-lg overflow-hidden mb-4 flex bg-gray-100">
             <div 
               className={`w-1/2 h-full relative ${selectedSide === 'left' ? 'ring-2 ring-indigo-500' : ''}`}
               onClick={() => setSelectedSide(prev => prev === 'left' ? null : 'left')}
@@ -299,12 +210,26 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
               <div
                 className="absolute"
                 style={{
-                  font: `${processedImages[selectedImage].textOptions?.bold ? 'bold' : ''} ${processedImages[selectedImage].textOptions?.italic ? 'italic' : ''} ${processedImages[selectedImage].textOptions?.size}px ${processedImages[selectedImage].textOptions?.font}`,
+                  font: `${processedImages[selectedImage].textOptions?.bold ? 'bold' : ''} ${
+                    processedImages[selectedImage].textOptions?.italic ? 'italic' : ''
+                  } ${processedImages[selectedImage].textOptions?.size}px ${
+                    processedImages[selectedImage].textOptions?.font
+                  }`,
                   color: processedImages[selectedImage].textOptions?.color || '#000000',
-                  textShadow: processedImages[selectedImage].textOptions?.stroke ? `-${processedImages[selectedImage].textOptions?.strokeWidth || 2}px -${processedImages[selectedImage].textOptions?.strokeWidth || 2}px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'},
-                  ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px -${processedImages[selectedImage].textOptions?.strokeWidth || 2}px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'},
-                  -${processedImages[selectedImage].textOptions?.strokeWidth || 2}px ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'},
-                  ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'}` : 'none',
+                  textShadow: processedImages[selectedImage].textOptions?.stroke 
+                    ? `-${processedImages[selectedImage].textOptions?.strokeWidth || 2}px -${
+                        processedImages[selectedImage].textOptions?.strokeWidth || 2
+                      }px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'}, 
+                      ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px -${
+                        processedImages[selectedImage].textOptions?.strokeWidth || 2
+                      }px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'}, 
+                      -${processedImages[selectedImage].textOptions?.strokeWidth || 2}px ${
+                        processedImages[selectedImage].textOptions?.strokeWidth || 2
+                      }px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'}, 
+                      ${processedImages[selectedImage].textOptions?.strokeWidth || 2}px ${
+                        processedImages[selectedImage].textOptions?.strokeWidth || 2
+                      }px 0 ${processedImages[selectedImage].textOptions?.strokeColor || '#FFFFFF'}`
+                    : 'none',
                   top: processedImages[selectedImage].textOptions?.position.includes('top') ? '10px' : 'unset',
                   bottom: processedImages[selectedImage].textOptions?.position.includes('bottom') ? '10px' : 'unset',
                   left: processedImages[selectedImage].textOptions?.position.includes('left') ? '10px' : 'unset',
