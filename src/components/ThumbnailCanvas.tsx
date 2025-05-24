@@ -1,5 +1,6 @@
+// src/components/ThumbnailCanvas.tsx
 import React, { useEffect, useRef } from 'react';
-import { renderCombinedImage } from '../utils/renderUtils';
+import { renderCombinedPreview } from '../utils/renderUtils';
 
 interface ThumbnailCanvasProps {
   leftPhoto: string;
@@ -18,7 +19,7 @@ const ThumbnailCanvas: React.FC<ThumbnailCanvasProps> = ({
   textOptions
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const scale = 300 / 1920; // Thumbnail width / Base width
+  const scale = 300 / 1920; // Thumbnail is 300px wide
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -35,7 +36,7 @@ const ThumbnailCanvas: React.FC<ThumbnailCanvasProps> = ({
 
     leftImg.onload = () => {
       rightImg.onload = () => {
-        renderCombinedImage(
+        renderCombinedPreview(
           ctx,
           leftImg,
           rightImg,
